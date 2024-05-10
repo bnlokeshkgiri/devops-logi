@@ -1,0 +1,66 @@
+	name: Pipeline
+
+	on:
+	  push:
+		branches: [ "master" ]
+	  pull_request:
+		branches: [ "master" ]
+
+	jobs:
+	  build:
+		runs-on: ubuntu-latest
+
+	  steps:
+	  - name: code checkout
+	    uses: actions/checkout@v4
+
+	  - name: Build application	
+        run: mkdir build ; cd build ; cmake .. ; make install 
+
+	  build-windows:
+		runs-on: windows-latest
+
+      steps:
+      - name: code checkout
+        uses: actions/checkout@v4
+
+      - name: Install Visual Studio Build Tools
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build application for Windows
+        run: mkdir build ; cd build ; cmake .. -G "Visual Studio 16 2019 Win64" ; msbuild .. /p:Configuration=Release 
+
+	  build-macos:
+		runs-on: macos-latest
+
+      steps:
+      - name: code checkout
+        uses: actions/checkout@v4
+
+      - name: Install Xcode
+        uses: actions/setup-xcode@v2
+
+      - name: Build application for macOS
+        run: mkdir build ; cd build ; cmake .. ; make install 
+      
+	  deploy:
+		runs-on: ubuntu-latest
+		needs: [build, build-windows, build-macos]
+
+      steps:
+      - name: code checkout
+        uses: actions/checkout@v4
+
+      - name: docker login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }} 	# stored in github secrets
+          password: ${{ secrets.DOCKERHUB_TOKEN }}    	# stored in github secrets
+
+      - name: docker image build
+        uses: docker/build-push-action@v5
+        with:
+		  context: .
+		  tags: user/app:latest
+          platforms: linux/amd64, linux/arm64, windows/amd64
+          push: true
